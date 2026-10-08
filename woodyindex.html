@@ -110,8 +110,9 @@ function setRes(s,fn){const g=s[0],[i,j]=s.slice(1).split("-").map(Number);
  if(g==="s")S.sat[i].r[j]=r;else S.sun[i].r=r;render();save()}
 $('app').addEventListener('change',e=>{const d=e.target.dataset;if(d.s&&d.k==="m")setRes(d.s,r=>r?Object.assign({},r,{m:e.target.value.trim()}):r)});
 $('app').addEventListener('click',e=>{const b=e.target.closest('[data-pick]');if(!b)return;const v=b.dataset.pick;setRes(b.dataset.s,()=>v?{w:v,m:""}:null)});
-const BID=new URLSearchParams(location.search).get('b');
-const ENDS=BID?[(window.WOODY_API||'https://jsonblob.com/api/jsonBlob/')+BID,'https://api.jsonblob.com/woody?blobId='+BID]:[];
+const P=new URLSearchParams(location.search),BID=P.get('b'),DB=P.get('db');
+const DBU=DB?(window.WOODY_DB||('https://'+DB.replace(/^https?:\/\//,'').replace(/\/+$/,'')))+'/woody.json':null;
+const ENDS=DBU?[DBU]:BID?[(window.WOODY_API||'https://jsonblob.com/api/jsonBlob/')+BID,'https://api.jsonblob.com/woody?blobId='+BID]:[];
 const CTS=['application/json','text/plain;charset=UTF-8'];
 const API=ENDS[0];let good=null,dirty=false,busy=false,live=true;
 const setMsg=(m,bad)=>{$('msg').textContent=m;$('bar').style.background=bad?'#8a1020':''};
@@ -121,7 +122,7 @@ async function flush(){if(busy||!dirty)return;busy=true;dirty=false;setMsg("Savi
  busy=false;
  if(done){setMsg("Saved. Everyone's screen updates within seconds.");if(dirty)flush()}
  else{dirty=true;setMsg("Not saved. Error: "+[...new Set(errs)].join(", ")+". Will retry in 10 seconds.",true);setTimeout(flush,10000)}}
-function save(){if(!API){setMsg("No scoreboard linked. Link needs ?b=... on the end.",true);return}dirty=true;flush()}
+function save(){if(!API){setMsg("No scoreboard linked. The link needs ?db=... on the end.",true);return}dirty=true;flush()}
 document.querySelector('nav').addEventListener('click',e=>{if(e.target.dataset.t){tab=e.target.dataset.t;render()}});
 admin=/[?&]admin/.test(location.search);
 async function load(){let ok=false;
@@ -129,7 +130,7 @@ async function load(){let ok=false;
  else for(const u of (good?[good[0]]:ENDS)){try{const r=await fetch(u,{cache:'no-store',headers:{'Accept':'application/json'}});if(r.ok){Object.assign(S,await r.json());ok=true;break}}catch(e){}}
  live=ok;if(!admin&&ENDS.length&&!ok)$('hint').textContent="Reconnecting to the scoreboard..."}
 render();
-if(admin){$('bar').hidden=false;setMsg(API?"Scorekeeper mode: tap Win or Halve. Scores save automatically.":"No scoreboard linked. Link needs ?b=... on the end.",!API)}
+if(admin){$('bar').hidden=false;setMsg(API?"Scorekeeper mode: tap Win or Halve. Scores save automatically.":"No scoreboard linked. The link needs ?db=... on the end.",!API)}
 load().then(()=>{render();if(admin)$('bar').hidden=false});
 if(!admin)setInterval(()=>load().then(render),15000);
 </script></body></html>
