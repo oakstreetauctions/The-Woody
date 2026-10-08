@@ -103,13 +103,16 @@ function render(){
    h+="</section>"});
   if(S.set)h+=`<p class="note">Saturday parts count for both partners.</p>`}
  $('app').innerHTML=h;
- $('hint').textContent=admin?"Scorekeeper mode: tap Win or Halve, then type the margin in the tag.":"Scores refresh automatically.";
+ $('hint').textContent=admin?"Scorekeeper mode: tap Win or Halve, then type the margin in the tag.":"Scores refresh automatically. v3";
 }
 function setRes(s,fn){const g=s[0],[i,j]=s.slice(1).split("-").map(Number);
  let r=(g==="s"?S.sat[i].r[j]:S.sun[i].r);r=fn(r);
  if(g==="s")S.sat[i].r[j]=r;else S.sun[i].r=r;render();save()}
 $('app').addEventListener('change',e=>{const d=e.target.dataset;if(d.s&&d.k==="m")setRes(d.s,r=>r?Object.assign({},r,{m:e.target.value.trim()}):r)});
 $('app').addEventListener('click',e=>{const b=e.target.closest('[data-pick]');if(!b)return;const v=b.dataset.pick;setRes(b.dataset.s,()=>v?{w:v,m:""}:null)});
+const toMap=()=>{const m={};S.sat.forEach((x,i)=>x.r.forEach((r,j)=>{if(r&&r.w)m["s"+i+"-"+j]=r.w+"|"+(r.m||"")}));S.sun.forEach((x,i)=>{if(x.r&&x.r.w)m["u"+i]=x.r.w+"|"+(x.r.m||"")});return m};
+const fromMap=m=>{m=m||{};const g=k=>{const v=m[k];if(typeof v!=="string")return null;const [w,...mm]=v.split("|");return w?{w,m:mm.join("|")}:null};
+ S.sat.forEach((x,i)=>{x.r=[0,1,2].map(j=>g("s"+i+"-"+j))});S.sun.forEach((x,i)=>{x.r=g("u"+i)})};
 const P=new URLSearchParams(location.search),BID=P.get('b'),DB=P.get('db');
 const DBU=DB?(window.WOODY_DB||('https://'+DB.replace(/^https?:\/\//,'').replace(/\/+$/,'')))+'/woody.json':null;
 const ENDS=DBU?[DBU]:BID?[(window.WOODY_API||'https://jsonblob.com/api/jsonBlob/')+BID,'https://api.jsonblob.com/woody?blobId='+BID]:[];
@@ -118,19 +121,20 @@ const API=ENDS[0];let good=null,dirty=false,busy=false,live=true;
 const setMsg=(m,bad)=>{$('msg').textContent=m;$('bar').style.background=bad?'#8a1020':''};
 const tries=()=>{const all=[];ENDS.forEach(u=>CTS.forEach(c=>all.push([u,c])));return good?[good].concat(all.filter(x=>x!==good)):all};
 async function flush(){if(busy||!dirty)return;busy=true;dirty=false;setMsg("Saving...");const errs=[];let done=false;
- for(const [u,c] of tries()){try{const r=await fetch(u,{method:'PUT',headers:{'Content-Type':c,'Accept':'application/json'},body:JSON.stringify(S)});if(r.ok){good=[u,c];done=true;break}errs.push(r.status)}catch(e){errs.push('blocked')}}
+ for(const [u,c] of tries()){try{const r=await fetch(u,{method:'PUT',headers:{'Content-Type':c,'Accept':'application/json'},body:JSON.stringify(DBU?toMap():S)});if(r.ok){good=[u,c];done=true;break}errs.push(r.status)}catch(e){errs.push('blocked')}}
  busy=false;
  if(done){setMsg("Saved. Everyone's screen updates within seconds.");if(dirty)flush()}
  else{dirty=true;setMsg("Not saved. Error: "+[...new Set(errs)].join(", ")+". Will retry in 10 seconds.",true);setTimeout(flush,10000)}}
 function save(){if(!API){setMsg("No scoreboard linked. The link needs ?db=... on the end.",true);return}dirty=true;flush()}
 document.querySelector('nav').addEventListener('click',e=>{if(e.target.dataset.t){tab=e.target.dataset.t;render()}});
 admin=/[?&]admin/.test(location.search);
-async function load(){let ok=false;
+let why="";
+async function load(){let ok=false;why="";
  if(!ENDS.length){try{const r=await fetch('data.json?'+Date.now(),{cache:'no-store'});if(r.ok){Object.assign(S,await r.json());ok=true}}catch(e){}}
- else for(const u of (good?[good[0]]:ENDS)){try{const r=await fetch(u,{cache:'no-store',headers:{'Accept':'application/json'}});if(r.ok){Object.assign(S,await r.json());ok=true;break}}catch(e){}}
- live=ok;if(!admin&&ENDS.length&&!ok)$('hint').textContent="Reconnecting to the scoreboard..."}
+ else for(const u of (good?[good[0]]:ENDS)){try{const r=await fetch(u,{cache:'no-store',headers:{'Accept':'application/json'}});if(r.ok){const d=await r.json();if(DBU)fromMap(d);else Object.assign(S,d);ok=true;break}why="error "+r.status}catch(e){why="blocked"}}
+ live=ok;if(!ok&&ENDS.length){if(admin)setMsg("Can't reach the scoreboard database ("+why+"). Scores will not save.",true);else $('hint').textContent="Reconnecting to the scoreboard..."}}
 render();
 if(admin){$('bar').hidden=false;setMsg(API?"Scorekeeper mode: tap Win or Halve. Scores save automatically.":"No scoreboard linked. The link needs ?db=... on the end.",!API)}
-load().then(()=>{render();if(admin)$('bar').hidden=false});
+load().then(()=>{render();if(admin)$('bar').hidden=false;if(admin&&live&&API)setMsg('Scorekeeper mode: tap Win or Halve. Scores save automatically.')});
 if(!admin)setInterval(()=>load().then(render),15000);
 </script></body></html>
